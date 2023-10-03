@@ -20,14 +20,12 @@ func New[K comparable](window time.Duration, limit uint32) *RatelimitZone[K] {
 		prevMap: make(map[K]uint32),
 		currMap: make(map[K]uint32),
 		window:  window,
+		limit:   limit,
 	}
 }
 
 func (z *RatelimitZone[K]) Allow(key K) bool {
-
-	now := time.Now().Truncate(0)
-	reqCurrWndStart := now.Truncate(z.window)
-	reqPrevWndStart := reqCurrWndStart.Add(-z.window)
+	reqPrevWndStart, reqCurrWndStart, now := z.getTimePoints()
 
 	z.mux.Lock()
 	defer z.mux.Unlock()
@@ -44,11 +42,27 @@ func (z *RatelimitZone[K]) Allow(key K) bool {
 	return true
 }
 
+func (z *RatelimitZone[K]) getTimePoints() (time.Time, time.Time, time.Time) {
+	now := time.Now().Truncate(0)
+	reqCurrWndStart := now.Truncate(z.window)
+	reqPrevWndStart := reqCurrWndStart.Add(-z.window)
+	return reqPrevWndStart, reqCurrWndStart, now
+}
+
 func (z *RatelimitZone[K]) orderMaps(prevStart, currStart time.Time) {
 	newCurrMap := z.getWndMap(currStart, true)
 	newPrevMap := z.getWndMap(prevStart, true)
 	z.currMap = newCurrMap
 	z.prevMap = newPrevMap
+	z.currWndStart = currStart
+	z.prevWndStart = prevStart
+}
+
+func (z *RatelimitZone[K]) GetWindowValue(key K) float64 {
+	reqPrevWndStart, reqCurrWndStart, now := z.getTimePoints()
+	z.mux.Lock()
+	defer z.mux.Unlock()
+	return z.getWindowValue(key, reqPrevWndStart, reqCurrWndStart, now)
 }
 
 func (z *RatelimitZone[K]) getWindowValue(key K, prevWndStart, currWndStart, now time.Time) float64 {
