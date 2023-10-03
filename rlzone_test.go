@@ -23,4 +23,9 @@ func TestRatelimitZone(t *testing.T) {
 	if !z.Allow("user2") {
 		t.Fatalf("unexpected deny to unrelated user")
 	}
+
+	time.Sleep(200 * time.Millisecond)
+	if !z.Allow("user1") {
+		t.Fatalf("ratelimit doesn't cool down!")
+	}
 }
