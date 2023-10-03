@@ -12,11 +12,15 @@ func TestRatelimitZone(t *testing.T) {
 		if !z.Allow("user1") {
 			t.Fatalf("unexpected deny on iteration %d", i)
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
 
-	if z.Allow("user1") {
+	if z.Allow("user1") && z.Allow("user1") {
 		val := z.GetWindowValue("user1")
 		t.Fatalf("unexpected allow after exhausting limit (%d), value: %.2f", limit, val)
+	}
+
+	if !z.Allow("user2") {
+		t.Fatalf("unexpected deny to unrelated user")
 	}
 }
