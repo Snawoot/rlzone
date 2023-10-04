@@ -15,7 +15,7 @@ type CounterValue interface {
 	uint | uint8 | uint16 | uint32 | uint64
 }
 
-// Ratelimit is a generic interface for specific key type, but for any uint counter size
+// Ratelimit is a generic interface for specific key type, but for any uint counter size.
 type Ratelimiter[K comparable] interface {
 	Allow(key K) bool
 	GetWindowValue(key K) float64
