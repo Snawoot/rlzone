@@ -1,3 +1,4 @@
+// Generic rate limit by key using sliding window algorithm.
 package rlzone
 
 import (
@@ -9,15 +10,22 @@ import (
 	"time"
 )
 
+// CounterValue is a type constraint for unsigned integer values of counter.
 type CounterValue interface {
 	uint | uint8 | uint16 | uint32 | uint64
 }
 
+// Ratelimit is a generic interface for specific key type, but for any uint counter size
 type Ratelimiter[K comparable] interface {
 	Allow(key K) bool
 	GetWindowValue(key K) float64
 }
 
+// RatelimitZone controls how frequently events are allowed to happen. It implements
+// sliding window of duration `window`, allowing approximately `limit` events within that
+// time frame.
+//
+// A RatelimitZone is safe for concurrent use by multiple goroutines.
 type RatelimitZone[K comparable, V CounterValue] struct {
 	prevMap      map[K]V
 	currMap      map[K]V
@@ -34,6 +42,11 @@ const (
 	uint32Max = uint64(^uint32(0))
 )
 
+// Must is a helper that wraps a call to a function returning (Ratelimiter[K], error)
+// and panics if the error is non-nil. It is intended for use in rate limiter
+// initializations such as
+//
+//	rl := Must(New[string](1*Second, 10))
 func Must[K comparable](rl Ratelimiter[K], err error) Ratelimiter[K] {
 	if err != nil {
 		panic(err)
@@ -41,6 +54,7 @@ func Must[K comparable](rl Ratelimiter[K], err error) Ratelimiter[K] {
 	return rl
 }
 
+// NewSmallest creates a new rate limiter with counter type wide enough to fit limit value.
 func NewSmallest[K comparable](window time.Duration, limit uint64) (Ratelimiter[K], error) {
 	switch {
 	case limit <= uint8Max:
@@ -53,6 +67,10 @@ func NewSmallest[K comparable](window time.Duration, limit uint64) (Ratelimiter[
 	return New[K](window, limit)
 }
 
+// FromString creates a new rate limiter from string specification <limit>/<duration>.
+// E.g. "100/20m" corresponds to 100 allowed events in 20 minutes sliding time window.
+//
+// See https://pkg.go.dev/time#ParseDuration for reference of duration format.
 func FromString[K comparable](limiterSpec string) (Ratelimiter[K], error) {
 	parts := strings.SplitN(limiterSpec, "/", 2)
 	if len(parts) != 2 {
@@ -73,6 +91,8 @@ func FromString[K comparable](limiterSpec string) (Ratelimiter[K], error) {
 	return NewSmallest[K](window, count)
 }
 
+// New creates new RatelimitZone with key type K and counter type V.
+// It will allow approximately `limit` events within `window` time frame.
 func New[K comparable, V CounterValue](window time.Duration, limit V) (*RatelimitZone[K, V], error) {
 	if window <= 0 {
 		return nil, errors.New("zero window value passed to ratelimit constructor!")
@@ -88,6 +108,7 @@ func New[K comparable, V CounterValue](window time.Duration, limit V) (*Ratelimi
 	}, nil
 }
 
+// Allow reports whether and event may happen now.
 func (z *RatelimitZone[K, V]) Allow(key K) bool {
 	reqPrevWndStart, reqCurrWndStart, now := z.getTimePoints()
 
@@ -122,6 +143,8 @@ func (z *RatelimitZone[K, V]) shiftMaps(prevStart, currStart time.Time) {
 	z.currWndStart = currStart
 }
 
+// GetWindowValue returns estimation how many events happend for a `key` within
+// sliding time window.
 func (z *RatelimitZone[K, V]) GetWindowValue(key K) float64 {
 	reqPrevWndStart, reqCurrWndStart, now := z.getTimePoints()
 	z.mux.Lock()
