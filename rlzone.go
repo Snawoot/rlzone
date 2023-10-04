@@ -1,6 +1,10 @@
 package rlzone
 
 import (
+	"errors"
+	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -25,12 +29,19 @@ type RatelimitZone[K comparable, V CounterValue] struct {
 }
 
 const (
-	uint8Max   = uint64(^uint8(0))
-	uint16Max  = uint64(^uint16(0))
-	uint32Max  = uint64(^uint32(0))
+	uint8Max  = uint64(^uint8(0))
+	uint16Max = uint64(^uint16(0))
+	uint32Max = uint64(^uint32(0))
 )
 
-func NewSmallest[K comparable](window time.Duration, limit uint64) Ratelimiter[K] {
+func Must[K comparable](rl Ratelimiter[K], err error) Ratelimiter[K] {
+	if err != nil {
+		panic(err)
+	}
+	return rl
+}
+
+func NewSmallest[K comparable](window time.Duration, limit uint64) (Ratelimiter[K], error) {
 	switch {
 	case limit <= uint8Max:
 		return New[K](window, uint8(limit))
@@ -42,19 +53,39 @@ func NewSmallest[K comparable](window time.Duration, limit uint64) Ratelimiter[K
 	return New[K](window, limit)
 }
 
-func New[K comparable, V CounterValue](window time.Duration, limit V) *RatelimitZone[K, V] {
-	if window == 0 {
-		panic("zero window value passed to ratelimit constructor!")
+func FromString[K comparable](limiterSpec string) (Ratelimiter[K], error) {
+	parts := strings.SplitN(limiterSpec, "/", 2)
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("bad limiter specification format, expected: <count>/<duration>, error: %w",
+			errors.New("slash is missing"))
+	}
+
+	count, err := strconv.ParseUint(parts[0], 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("bad limiter specification format, expected: <count>/<duration>, error: %w", err)
+	}
+
+	window, err := time.ParseDuration(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("bad limiter specification format, expected: <count>/<duration>, error: %w", err)
+	}
+
+	return NewSmallest[K](window, count)
+}
+
+func New[K comparable, V CounterValue](window time.Duration, limit V) (*RatelimitZone[K, V], error) {
+	if window <= 0 {
+		return nil, errors.New("zero window value passed to ratelimit constructor!")
 	}
 	if limit == 0 {
-		panic("zero limit value passed to ratelimit constructor!")
+		return nil, errors.New("zero limit value passed to ratelimit constructor!")
 	}
 	return &RatelimitZone[K, V]{
 		prevMap: make(map[K]V),
 		currMap: make(map[K]V),
 		window:  window,
 		limit:   limit,
-	}
+	}, nil
 }
 
 func (z *RatelimitZone[K, V]) Allow(key K) bool {

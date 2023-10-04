@@ -9,7 +9,8 @@ func TestRatelimitZone(t *testing.T) {
 	const limit = 20
 	const wnd = time.Second
 	const sleepStep = wnd / limit
-	z := New[string](wnd, uint8(limit))
+
+	z := Must(New[string](wnd, uint8(limit)))
 	for i := 0; i < limit-1; i++ {
 		if i != 0 {
 			time.Sleep(sleepStep)
@@ -56,25 +57,96 @@ func TestRatelimitZone(t *testing.T) {
 
 func TestNewSmallest(t *testing.T) {
 	wnd := time.Second
-	if _, ok := NewSmallest[struct{}](wnd, uint64(1)).(*RatelimitZone[struct{}, uint8]); !ok {
+	if _, ok := Must(NewSmallest[struct{}](wnd, uint64(1))).(*RatelimitZone[struct{}, uint8]); !ok {
 		t.Fatal("expected uint8 variant of structure")
 	}
-	if _, ok := NewSmallest[struct{}](wnd, uint64(255)).(*RatelimitZone[struct{}, uint8]); !ok {
+	if _, ok := Must(NewSmallest[struct{}](wnd, uint64(255))).(*RatelimitZone[struct{}, uint8]); !ok {
 		t.Fatal("expected uint8 variant of structure")
 	}
-	if _, ok := NewSmallest[struct{}](wnd, uint64(256)).(*RatelimitZone[struct{}, uint16]); !ok {
+	if _, ok := Must(NewSmallest[struct{}](wnd, uint64(256))).(*RatelimitZone[struct{}, uint16]); !ok {
 		t.Fatal("expected uint16 variant of structure")
 	}
-	if _, ok := NewSmallest[struct{}](wnd, uint64(65535)).(*RatelimitZone[struct{}, uint16]); !ok {
+	if _, ok := Must(NewSmallest[struct{}](wnd, uint64(65535))).(*RatelimitZone[struct{}, uint16]); !ok {
 		t.Fatal("expected uint16 variant of structure")
 	}
-	if _, ok := NewSmallest[struct{}](wnd, uint64(65536)).(*RatelimitZone[struct{}, uint32]); !ok {
+	if _, ok := Must(NewSmallest[struct{}](wnd, uint64(65536))).(*RatelimitZone[struct{}, uint32]); !ok {
 		t.Fatal("expected uint32 variant of structure")
 	}
-	if _, ok := NewSmallest[struct{}](wnd, uint64(4294967295)).(*RatelimitZone[struct{}, uint32]); !ok {
+	if _, ok := Must(NewSmallest[struct{}](wnd, uint64(4294967295))).(*RatelimitZone[struct{}, uint32]); !ok {
 		t.Fatal("expected uint32 variant of structure")
 	}
-	if _, ok := NewSmallest[struct{}](wnd, uint64(4294967296)).(*RatelimitZone[struct{}, uint64]); !ok {
+	if _, ok := Must(NewSmallest[struct{}](wnd, uint64(4294967296))).(*RatelimitZone[struct{}, uint64]); !ok {
 		t.Fatal("expected uint64 variant of structure")
+	}
+}
+
+type limiterCharacteristic struct {
+	window time.Duration
+	limit  uint64
+}
+
+func characterize[K comparable](limiter Ratelimiter[K]) limiterCharacteristic {
+	switch l := limiter.(type) {
+	case *RatelimitZone[K, uint8]:
+		return limiterCharacteristic{
+			window: l.window,
+			limit:  uint64(l.limit),
+		}
+	case *RatelimitZone[K, uint16]:
+		return limiterCharacteristic{
+			window: l.window,
+			limit:  uint64(l.limit),
+		}
+	case *RatelimitZone[K, uint32]:
+		return limiterCharacteristic{
+			window: l.window,
+			limit:  uint64(l.limit),
+		}
+	case *RatelimitZone[K, uint64]:
+		return limiterCharacteristic{
+			window: l.window,
+			limit:  uint64(l.limit),
+		}
+	case *RatelimitZone[K, uint]:
+		return limiterCharacteristic{
+			window: l.window,
+			limit:  uint64(l.limit),
+		}
+	}
+	panic("unknown type!")
+}
+
+func TestFromString(t *testing.T) {
+	testCases := []struct {
+		in  string
+		out Ratelimiter[string]
+	}{
+		{
+			in:  "100/1m",
+			out: Must(NewSmallest[string](1*time.Minute, 100)),
+		},
+		{
+			in:  "10/1m30s",
+			out: Must(NewSmallest[string](90*time.Second, 10)),
+		},
+		{
+			in:  "10000/1h",
+			out: Must(NewSmallest[string](1*time.Hour, 10000)),
+		},
+		{
+			in:  "70/1s",
+			out: Must(NewSmallest[string](1*time.Second, 70)),
+		},
+		{
+			in:  "10000000000/24h",
+			out: Must(NewSmallest[string](24*time.Hour, 10000000000)),
+		},
+	}
+
+	for i, tc := range testCases {
+		created := Must(FromString[string](tc.in))
+		if characterize(created) != characterize(tc.out) {
+			t.Errorf("test case #%d failed: created %#v != %#v", i, created, tc.out)
+		}
 	}
 }
