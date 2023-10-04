@@ -20,6 +20,9 @@ type Ratelimiter[K comparable] interface {
 	Allow(key K) bool
 	AllowN(key K, n uint64) bool
 	GetWindowValue(key K) float64
+	String() string
+	Limit() uint64
+	Window() time.Duration
 }
 
 // RatelimitZone controls how frequently events are allowed to happen. It implements
@@ -190,4 +193,21 @@ func (z *RatelimitZone[K, V]) getWndMap(wndStart time.Time, create bool) map[K]V
 		return make(map[K]V)
 	}
 	return nil
+}
+
+// String method formats rate limit parameters into a string,
+// compatible with format accepted by FromString function
+func (z *RatelimitZone[K, V]) String() string {
+	return fmt.Sprintf("%d/%s", z.limit, z.window.String())
+}
+
+
+// Limit method returns limit setting of rate limiter
+func (z *RatelimitZone[K, V]) Limit() uint64 {
+	return uint64(z.limit)
+}
+
+// Window method returns limit setting of rate limiter
+func (z *RatelimitZone[K, V]) Window() time.Duration {
+	return z.window
 }
