@@ -53,3 +53,28 @@ func TestRatelimitZone(t *testing.T) {
 		t.Fatal("ratelimit doesn't account past events!")
 	}
 }
+
+func TestNewSmallest(t *testing.T) {
+	wnd := time.Second
+	if _, ok := NewSmallest[struct{}](wnd, uint64(1)).(*RatelimitZone[struct{}, uint8]); !ok {
+		t.Fatal("expected uint8 variant of structure")
+	}
+	if _, ok := NewSmallest[struct{}](wnd, uint64(255)).(*RatelimitZone[struct{}, uint8]); !ok {
+		t.Fatal("expected uint8 variant of structure")
+	}
+	if _, ok := NewSmallest[struct{}](wnd, uint64(256)).(*RatelimitZone[struct{}, uint16]); !ok {
+		t.Fatal("expected uint16 variant of structure")
+	}
+	if _, ok := NewSmallest[struct{}](wnd, uint64(65535)).(*RatelimitZone[struct{}, uint16]); !ok {
+		t.Fatal("expected uint16 variant of structure")
+	}
+	if _, ok := NewSmallest[struct{}](wnd, uint64(65536)).(*RatelimitZone[struct{}, uint32]); !ok {
+		t.Fatal("expected uint32 variant of structure")
+	}
+	if _, ok := NewSmallest[struct{}](wnd, uint64(4294967295)).(*RatelimitZone[struct{}, uint32]); !ok {
+		t.Fatal("expected uint32 variant of structure")
+	}
+	if _, ok := NewSmallest[struct{}](wnd, uint64(4294967296)).(*RatelimitZone[struct{}, uint64]); !ok {
+		t.Fatal("expected uint64 variant of structure")
+	}
+}

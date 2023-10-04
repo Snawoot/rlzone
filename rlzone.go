@@ -9,6 +9,11 @@ type CounterValue interface {
 	uint | uint8 | uint16 | uint32 | uint64
 }
 
+type Ratelimiter[K comparable] interface {
+	Allow(key K) bool
+	GetWindowValue(key K) float64
+}
+
 type RatelimitZone[K comparable, V CounterValue] struct {
 	prevMap      map[K]V
 	currMap      map[K]V
@@ -19,6 +24,24 @@ type RatelimitZone[K comparable, V CounterValue] struct {
 	mux          sync.Mutex
 }
 
+const (
+	uint8Max   = uint64(^uint8(0))
+	uint16Max  = uint64(^uint16(0))
+	uint32Max  = uint64(^uint32(0))
+)
+
+func NewSmallest[K comparable](window time.Duration, limit uint64) Ratelimiter[K] {
+	switch {
+	case limit <= uint8Max:
+		return New[K](window, uint8(limit))
+	case limit <= uint16Max:
+		return New[K](window, uint16(limit))
+	case limit <= uint32Max:
+		return New[K](window, uint32(limit))
+	}
+	return New[K](window, limit)
+}
+
 func New[K comparable, V CounterValue](window time.Duration, limit V) *RatelimitZone[K, V] {
 	if window == 0 {
 		panic("zero window value passed to ratelimit constructor!")
@@ -26,7 +49,7 @@ func New[K comparable, V CounterValue](window time.Duration, limit V) *Ratelimit
 	if limit == 0 {
 		panic("zero limit value passed to ratelimit constructor!")
 	}
-	return &RatelimitZone[K,V]{
+	return &RatelimitZone[K, V]{
 		prevMap: make(map[K]V),
 		currMap: make(map[K]V),
 		window:  window,
