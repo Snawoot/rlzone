@@ -150,3 +150,16 @@ func TestFromString(t *testing.T) {
 		}
 	}
 }
+
+func TestAllowN(t *testing.T) {
+	const limit = 20
+	const wnd = time.Second
+
+	z := Must(New[string](wnd, uint8(limit)))
+	if !z.AllowN("", limit) {
+		t.Fatalf("unexpected deny")
+	}
+	if z.Allow("") {
+		t.Fatalf("unexpected allow")
+	}
+}
