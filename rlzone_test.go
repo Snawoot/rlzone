@@ -148,6 +148,16 @@ func TestFromString(t *testing.T) {
 		if characterize(created) != characterize(tc.out) {
 			t.Errorf("test case #%d failed: created %#v != %#v", i, created, tc.out)
 		}
+		if created.String() != tc.out.String() {
+			t.Errorf("test case #%d failed: created.String() result %q != %q", i, created.String(), tc.out.String())
+		}
+		if created.Limit() != tc.out.Limit() {
+			t.Errorf("test case #%d failed: created.Limit() result %d != %d", i, created.Limit(), tc.out.Limit())
+		}
+		if created.Window() != tc.out.Window() {
+			t.Errorf("test case #%d failed: created.String() result %q != %q",
+				i, created.Window().String(), tc.out.Window().String())
+		}
 	}
 }
 
