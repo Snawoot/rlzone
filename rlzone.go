@@ -43,19 +43,19 @@ func (z *RatelimitZone[K]) Allow(key K) bool {
 }
 
 func (z *RatelimitZone[K]) getTimePoints() (time.Time, time.Time, time.Time) {
-	now := time.Now().Truncate(0)
+	now := time.Now().UTC().Truncate(0)
 	reqCurrWndStart := now.Truncate(z.window)
 	reqPrevWndStart := reqCurrWndStart.Add(-z.window)
 	return reqPrevWndStart, reqCurrWndStart, now
 }
 
 func (z *RatelimitZone[K]) orderMaps(prevStart, currStart time.Time) {
-	newCurrMap := z.getWndMap(currStart, true)
 	newPrevMap := z.getWndMap(prevStart, true)
-	z.currMap = newCurrMap
 	z.prevMap = newPrevMap
-	z.currWndStart = currStart
 	z.prevWndStart = prevStart
+	newCurrMap := z.getWndMap(currStart, true)
+	z.currMap = newCurrMap
+	z.currWndStart = currStart
 }
 
 func (z *RatelimitZone[K]) GetWindowValue(key K) float64 {
@@ -87,9 +87,9 @@ func (z *RatelimitZone[K]) incCounter(key K, wndStart time.Time) {
 
 func (z *RatelimitZone[K]) getWndMap(wndStart time.Time, create bool) map[K]uint32 {
 	switch {
-	case wndStart == z.currWndStart:
+	case wndStart.Equal(z.currWndStart):
 		return z.currMap
-	case wndStart == z.prevWndStart:
+	case wndStart.Equal(z.prevWndStart):
 		return z.prevMap
 	}
 	if create {
