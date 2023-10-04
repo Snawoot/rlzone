@@ -16,6 +16,12 @@ type RatelimitZone[K comparable] struct {
 }
 
 func New[K comparable](window time.Duration, limit uint32) *RatelimitZone[K] {
+	if window == 0 {
+		panic("zero window value passed to ratelimit constructor!")
+	}
+	if limit == 0 {
+		panic("zero limit value passed to ratelimit constructor!")
+	}
 	return &RatelimitZone[K]{
 		prevMap: make(map[K]uint32),
 		currMap: make(map[K]uint32),
@@ -31,11 +37,11 @@ func (z *RatelimitZone[K]) Allow(key K) bool {
 	defer z.mux.Unlock()
 
 	val := z.getWindowValue(key, reqPrevWndStart, reqCurrWndStart, now)
-	if float64(z.limit) <= val {
+	if val+1 > float64(z.limit) {
 		return false
 	}
 
-	z.orderMaps(reqPrevWndStart, reqCurrWndStart)
+	z.shiftMaps(reqPrevWndStart, reqCurrWndStart)
 
 	z.incCounter(key, reqCurrWndStart)
 
@@ -49,7 +55,7 @@ func (z *RatelimitZone[K]) getTimePoints() (time.Time, time.Time, time.Time) {
 	return reqPrevWndStart, reqCurrWndStart, now
 }
 
-func (z *RatelimitZone[K]) orderMaps(prevStart, currStart time.Time) {
+func (z *RatelimitZone[K]) shiftMaps(prevStart, currStart time.Time) {
 	newPrevMap := z.getWndMap(prevStart, true)
 	z.prevMap = newPrevMap
 	z.prevWndStart = prevStart
@@ -69,7 +75,8 @@ func (z *RatelimitZone[K]) getWindowValue(key K, prevWndStart, currWndStart, now
 	prevCtr := z.getCounter(key, prevWndStart)
 	currCtr := z.getCounter(key, currWndStart)
 	multiplier := 1 - (float64(now.Sub(currWndStart)) / float64(z.window))
-	return float64(prevCtr)*multiplier + float64(currCtr)
+	res := float64(prevCtr)*multiplier + float64(currCtr)
+	return res
 }
 
 func (z *RatelimitZone[K]) getCounter(key K, wndStart time.Time) uint32 {
