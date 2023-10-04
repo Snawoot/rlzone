@@ -9,7 +9,7 @@ func TestRatelimitZone(t *testing.T) {
 	const limit = 20
 	const wnd = time.Second
 	const sleepStep = wnd / limit
-	z := New[string](wnd, limit)
+	z := New[string](wnd, uint8(limit))
 	for i := 0; i < limit-1; i++ {
 		if i != 0 {
 			time.Sleep(sleepStep)
