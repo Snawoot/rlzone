@@ -173,3 +173,19 @@ func TestAllowN(t *testing.T) {
 		t.Fatalf("unexpected allow")
 	}
 }
+
+func benchmarkAllow[V CounterValue](b *testing.B) {
+	const limit = 100
+	z := Must(NewSmallest[int](time.Minute, limit+1))
+	useBuckets := b.N + limit - 1 / limit
+	for i := 0; i < b.N; i++ {
+		if !z.Allow(i%useBuckets) {
+			b.FailNow()
+		}
+	}
+}
+
+func BenchmarkAllowUint8(b *testing.B)  { benchmarkAllow[uint8](b) }
+func BenchmarkAllowUint16(b *testing.B) { benchmarkAllow[uint16](b) }
+func BenchmarkAllowUint32(b *testing.B) { benchmarkAllow[uint32](b) }
+func BenchmarkAllowUint64(b *testing.B) { benchmarkAllow[uint64](b) }

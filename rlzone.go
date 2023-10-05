@@ -201,7 +201,6 @@ func (z *RatelimitZone[K, V]) String() string {
 	return fmt.Sprintf("%d/%s", z.limit, z.window.String())
 }
 
-
 // Limit method returns limit setting of rate limiter
 func (z *RatelimitZone[K, V]) Limit() uint64 {
 	return uint64(z.limit)
