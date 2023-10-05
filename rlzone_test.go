@@ -175,7 +175,7 @@ func TestAllowN(t *testing.T) {
 }
 
 func benchmarkAllow[V CounterValue](b *testing.B) {
-	const limit = 100
+	const limit = 250
 	z := Must(NewSmallest[int](time.Minute, limit+1))
 	useBuckets := b.N + limit - 1 / limit
 	for i := 0; i < b.N; i++ {
